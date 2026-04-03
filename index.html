@@ -250,7 +250,8 @@
         let isRecording = false;
         let currentMainCat = "行车";
         let stream;
-        let finalText = "";
+        let recRef = null;
+        let recognizedText = "";
 
         // 一次性获取麦克风权限
         async function getStream() {
@@ -262,25 +263,25 @@
 
         // 语音识别（稳定版）
         function startRecognition() {
-            return new Promise((resolve) => {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    resolve("当前浏览器不支持语音转文字");
-                    return;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) { alert("浏览器不支持语音识别"); return; }
+
+            recRef = new SpeechRecognition();
+            recRef.lang = "zh-CN";
+            recRef.interimResults = false;
+            recRef.continuous = true;
+            recRef.maxAlternatives = 1;
+
+            recognizedText = "";
+            recRef.onresult = (e) => {
+                for (let i = e.resultIndex; i < e.results.length; i++) {
+                    if (e.results[i].isFinal) {
+                        recognizedText += e.results[i][0].transcript;
+                    }
                 }
-
-                const rec = new SpeechRecognition();
-                rec.lang = "zh-CN";
-                rec.interimResults = false;
-                rec.maxAlternatives = 1;
-
-                let text = "";
-                rec.onresult = (e) => {
-                    text = e.results[0][0].transcript;
-                };
-                rec.onend = () => resolve(text);
-                rec.start();
-            });
+            };
+            recRef.onerror = (e) => { console.error("识别错误:", e.error); };
+            recRef.start();
         }
 
         function selectMainCat(cat) {
@@ -318,39 +319,37 @@
         async function toggleRecord() {
             const btn = document.getElementById('recordBtn');
             if (!isRecording) {
+                // ── 开始录音 ──
                 isRecording = true;
                 btn.innerText = "录音中...\n点击停止";
                 btn.classList.add('recording');
 
                 await getStream();
-                finalText = "";
-
                 audioChunks = [];
                 mediaRecorder = new MediaRecorder(stream);
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.start();
-
-                // 同步开启识别
-                startRecognition().then(t => { finalText = t; });
-            } else {
-                isRecording = false;
-                btn.innerText = "点击录音\n记录问题";
-                btn.classList.remove('recording');
-
-                mediaRecorder.stop();
-                mediaRecorder.onstop = async () => {
+                mediaRecorder.onstop = () => {
                     const blob = new Blob(audioChunks, { type: 'audio/wav' });
                     const url = URL.createObjectURL(blob);
-
                     allRecords.push({
                         time: getNowTime(),
                         mainCat: currentMainCat,
                         type: "产品性能问题",
-                        text: finalText || "未识别到语音",
+                        text: recognizedText || "未识别到语音",
                         audioUrl: url
                     });
                     renderRecords();
+                    btn.innerText = "点击录音\n记录问题";
+                    btn.classList.remove('recording');
                 };
+                mediaRecorder.start();
+                startRecognition();
+
+            } else {
+                // ── 停止录音 ──
+                isRecording = false;
+                if (recRef) { recRef.stop(); recRef = null; }
+                mediaRecorder.stop();
             }
         }
 
