@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>辅助驾驶走查问题记录器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 15px;
+            background: #f5f7fa;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            margin: 10px 0 10px;
+            color: #222;
+        }
+
+        .main-category {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .main-category button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background: #eee;
+            color: #333;
+        }
+        .main-category button.active {
+            background: #1890ff;
+            color: #fff;
+        }
+
+        .mileage-box {
+            background: #fff;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .mileage-box label {
+            font-weight: bold;
+            color: #333;
+        }
+        .mileage-box input {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .btn-clear, .btn-export {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .btn-clear { background: #ff4d4f; color: white; }
+        .btn-export { background: #1890ff; color: white; }
+
+        .module {
+            background: white;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .module-title {
+            font-size: 17px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .performance-btn {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: #13c2c2;
+            color: white;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+            margin: 0 auto;
+            display: block;
+        }
+        .performance-btn.recording {
+            background: #ff4d4f;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+
+        .comfort-btns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .comfort-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .comfort-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .comfort-count {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ff4d4f;
+            min-width: 24px;
+            text-align: center;
+        }
+        .comfort-add {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #fa8c16;
+            color: white;
+            font-size: 20px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .record-list { margin-top: 20px; }
+        .record-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .empty-tip {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+        audio {
+            width: 100%;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="title">辅助驾驶走查问题记录器</div>
+
+    <div class="main-category">
+        <button id="catDrive" class="active" onclick="selectMainCat('行车')">行车</button>
+        <button id="catPark" onclick="selectMainCat('泊车')">泊车</button>
+        <button id="catOther" onclick="selectMainCat('其他')">其他</button>
+    </div>
+
+    <div class="mileage-box">
+        <label>本次总行驶里程：</label>
+        <input type="number" id="totalMileage" placeholder="请输入公里数" step="0.1">
+        <span>km</span>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn-clear" onclick="clearAll()">清空所有记录</button>
+        <button class="btn-export" onclick="exportRecord()">导出记录文档</button>
+    </div>
+
+    <div class="module">
+        <div class="module-title">🎯 产品性能问题（点击录音，再点停止）</div>
+        <button id="recordBtn" class="performance-btn" onclick="toggleRecord()">点击录音<br>记录问题</button>
+    </div>
+
+    <div class="module">
+        <div class="module-title">🚗 驾乘舒适性问题（实时计数）</div>
+        <div class="comfort-btns">
+            <div class="comfort-item">
+                <div class="comfort-info">
+                    <span>画龙</span>
+                    <span class="comfort-count" id="cnt_drawlong">0</span>
+                </div>
+                <button class="comfort-add" onclick="recordComfort('画龙','cnt_drawlong')">+1</button>
+            </div>
+            <div class="comfort-item">
+                <div class="comfort-info">
+                    <span>顿挫</span>
+                    <span class="comfort-count" id="cnt_unsmooth">0</span>
+                </div>
+                <button class="comfort-add" onclick="recordComfort('顿挫','cnt_unsmooth')">+1</button>
+            </div>
+            <div class="comfort-item">
+                <div class="comfort-info">
+                    <span>急刹</span>
+                    <span class="comfort-count" id="cnt_brake">0</span>
+                </div>
+                <button class="comfort-add" onclick="recordComfort('急刹','cnt_brake')">+1</button>
+            </div>
+            <div class="comfort-item">
+                <div class="comfort-info">
+                    <span>猛打方向</span>
+                    <span class="comfort-count" id="cnt_steer">0</span>
+                </div>
+                <button class="comfort-add" onclick="recordComfort('猛打方向','cnt_steer')">+1</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="module record-list">
+        <div class="module-title">📝 实时记录列表</div>
+        <div id="recordContainer" class="empty-tip">暂无记录</div>
+    </div>
+
+    <script>
+        let allRecords = [];
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let currentMainCat = "行车";
+        let stream;
+        let finalText = "";
+
+        // 一次性获取麦克风权限
+        async function getStream() {
+            if (!stream) {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+            return stream;
+        }
+
+        // 语音识别（稳定版）
+        function startRecognition() {
+            return new Promise((resolve) => {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    resolve("当前浏览器不支持语音转文字");
+                    return;
+                }
+
+                const rec = new SpeechRecognition();
+                rec.lang = "zh-CN";
+                rec.interimResults = false;
+                rec.maxAlternatives = 1;
+
+                let text = "";
+                rec.onresult = (e) => {
+                    text = e.results[0][0].transcript;
+                };
+                rec.onend = () => resolve(text);
+                rec.start();
+            });
+        }
+
+        function selectMainCat(cat) {
+            currentMainCat = cat;
+            document.querySelectorAll('.main-category button').forEach(b => b.classList.remove('active'));
+            document.getElementById('catDrive').classList.add('active');
+            if (cat === '泊车') document.getElementById('catPark').classList.add('active');
+            if (cat === '其他') document.getElementById('catOther').classList.add('active');
+        }
+
+        function getNowTime() {
+            const d = new Date();
+            const h = String(d.getHours()).padStart(2, '0');
+            const m = String(d.getMinutes()).padStart(2, '0');
+            const s = String(d.getSeconds()).padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        function renderRecords() {
+            const c = document.getElementById('recordContainer');
+            if (allRecords.length === 0) {
+                c.innerHTML = '<div class="empty-tip">暂无记录</div>';
+                return;
+            }
+            let html = '';
+            allRecords.forEach((item, i) => {
+                html += `<div class="record-item">${i+1}. [${item.time}] [${item.mainCat}] ${item.type}`;
+                if (item.text) html += `<br>📝 ${item.text}`;
+                if (item.audioUrl) html += `<br><audio controls src="${item.audioUrl}">`;
+                html += `</div>`;
+            });
+            c.innerHTML = html;
+        }
+
+        async function toggleRecord() {
+            const btn = document.getElementById('recordBtn');
+            if (!isRecording) {
+                isRecording = true;
+                btn.innerText = "录音中...\n点击停止";
+                btn.classList.add('recording');
+
+                await getStream();
+                finalText = "";
+
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.start();
+
+                // 同步开启识别
+                startRecognition().then(t => { finalText = t; });
+            } else {
+                isRecording = false;
+                btn.innerText = "点击录音\n记录问题";
+                btn.classList.remove('recording');
+
+                mediaRecorder.stop();
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const url = URL.createObjectURL(blob);
+
+                    allRecords.push({
+                        time: getNowTime(),
+                        mainCat: currentMainCat,
+                        type: "产品性能问题",
+                        text: finalText || "未识别到语音",
+                        audioUrl: url
+                    });
+                    renderRecords();
+                };
+            }
+        }
+
+        function recordComfort(issue, cntId) {
+            const el = document.getElementById(cntId);
+            el.textContent = parseInt(el.textContent) + 1;
+            allRecords.push({
+                time: getNowTime(),
+                mainCat: currentMainCat,
+                type: `舒适性 - ${issue}`
+            });
+            renderRecords();
+        }
+
+        function clearAll() {
+            if (!confirm("确定清空？")) return;
+            allRecords = [];
+            document.getElementById('totalMileage').value = '';
+            document.getElementById('cnt_drawlong').textContent = '0';
+            document.getElementById('cnt_unsmooth').textContent = '0';
+            document.getElementById('cnt_brake').textContent = '0';
+            document.getElementById('cnt_steer').textContent = '0';
+            renderRecords();
+        }
+
+        function exportRecord() {
+            const mile = document.getElementById('totalMileage').value || '未填写';
+            if (allRecords.length === 0) { alert("暂无记录"); return; }
+
+            let content = "===== 辅助驾驶走查问题记录 =====\n";
+            content += "导出时间：" + new Date().toLocaleString() + "\n";
+            content += "总里程：" + mile + " km\n";
+            content += "========================================\n";
+            content += "画龙：" + document.getElementById('cnt_drawlong').textContent + " 次\n";
+            content += "顿挫：" + document.getElementById('cnt_unsmooth').textContent + " 次\n";
+            content += "急刹：" + document.getElementById('cnt_brake').textContent + " 次\n";
+            content += "猛打方向：" + document.getElementById('cnt_steer').textContent + " 次\n";
+            content += "========================================\n\n";
+
+            allRecords.forEach((item, i) => {
+                content += `${i+1}. [${item.time}] [${item.mainCat}] ${item.type}\n`;
+                if (item.text) content += `   描述：${item.text}\n`;
+                content += "\n";
+            });
+
+            const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "辅助驾驶记录.txt";
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+    </script>
+</body>
+</html>
